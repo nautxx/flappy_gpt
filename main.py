@@ -6,7 +6,9 @@ import os
 # Constants
 WIDTH = 400
 HEIGHT = 600
+GROUND_HEIGHT = 100
 BACKGROUND_COLOR = (135, 206, 250)
+GROUND_COLOR = (0, 128, 0)
 BIRD_COLOR = (255, 255, 0)
 PIPE_COLOR = (0, 255, 0)
 GRAVITY = 0.25
@@ -16,7 +18,7 @@ MIN_PIPE_DISTANCE = 200
 # Class for the Bird
 class Bird:
     def __init__(self):
-        self.y = HEIGHT // 2
+        self.y = random.randint(HEIGHT//4, HEIGHT-4*GROUND_HEIGHT)  # Start bird at random height above ground
         self.x = 50
         self.velocity = 0
         self.gravity = GRAVITY
@@ -31,13 +33,16 @@ class Bird:
     def draw(self, screen):
         pygame.draw.circle(screen, BIRD_COLOR, (self.x, int(self.y)), 20)
 
+    def hits_ground(self):
+        return self.y + 20 > HEIGHT - GROUND_HEIGHT
+
 # Class for the Pipe
 class Pipe:
     def __init__(self):
         self.gap = 200
         self.x = WIDTH
         self.width = 50
-        self.top = random.randint(0, HEIGHT - self.gap)
+        self.top = random.randint(0, HEIGHT - self.gap - GROUND_HEIGHT)  # Adjusted to prevent going below ground
         self.bottom = self.top + self.gap
 
     def update(self):
@@ -86,6 +91,11 @@ start_screen = True
 # File to store top score
 top_score_file = "top_score.txt"
 
+# Function to save top score to file
+def save_top_score():
+    with open(top_score_file, "w") as file:
+        file.write(str(top_score))
+
 # Load top score from file if it exists
 if os.path.exists(top_score_file):
     with open(top_score_file, "r") as file:
@@ -96,14 +106,16 @@ while True:
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             # Save top score to file before quitting
-            with open(top_score_file, "w") as file:
-                file.write(str(top_score))
+            save_top_score()
             pygame.quit()
             sys.exit()
         elif event.type == pygame.KEYDOWN:
             if event.key == pygame.K_SPACE:
                 if start_screen:
                     start_screen = False
+                    bird = Bird()  # Reset bird position
+                    pipes = []     # Reset pipes
+                    score = 0      # Reset score
                 else:
                     bird.flap()
 
@@ -121,6 +133,9 @@ while True:
         text_rect = text.get_rect(center=(WIDTH // 2, HEIGHT // 2))
         screen.blit(text, text_rect)
     else:
+        # Draw ground
+        pygame.draw.rect(screen, GROUND_COLOR, (0, HEIGHT - GROUND_HEIGHT, WIDTH, GROUND_HEIGHT))
+
         # Add new pipe only if last pipe is far enough from screen edge
         if len(pipes) == 0 or WIDTH - pipes[-1].x > MIN_PIPE_DISTANCE:
             pipes.append(Pipe())
@@ -131,12 +146,12 @@ while True:
         for pipe in pipes:
             pipe.update()
             pipe.draw(screen)
-            if pipe.hits(bird):
+            if pipe.hits(bird) or bird.hits_ground():  # Check if bird hits ground
                 if score > top_score:
                     top_score = score
-                score = 0
-                pipes = []
-                start_screen = True
+                    save_top_score()  # Update top score in file
+                start_screen = True  # Game over, return to start screen
+
             if pipe.off_screen():
                 pipes.remove(pipe)
                 score += 1
